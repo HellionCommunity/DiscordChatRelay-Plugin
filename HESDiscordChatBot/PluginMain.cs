@@ -1,78 +1,109 @@
-﻿using Discord;
-using Discord.WebSocket;
+﻿using Discord.WebSocket;
 using HellionExtendedServer.Common.Plugins;
 using HellionExtendedServer.Managers.Plugins;
-using Newtonsoft.Json;
 using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using ZeroGravity.Network;
-using ZeroGravity.Objects;
 
 namespace HESDiscordChatBot
 {
-    public class MyConfig
-    {
-        public string DiscordToken;
-        public ulong MainChannelID;
-    }
-
-    [Plugin(API = "1.0.0", Author = "generalwrex",
-        Description = "Links Chat to/from discord via a bot",
-        Name = "HesDiscordChatBot", Version = "1.0.0")]
+    [Plugin(API = "1.0.0", Author = "generalwrex", Description = "Links Chat to/from discord via a bot", Name = "HesDiscordChatBot", Version = "1.0.0")]
     public class PluginMain : PluginBase
     {
-        private static DiscordSocketClient _client;
-
-        private static MyConfig myConfig = new MyConfig();
+        private static bool debugMode;
+        private static ulong channelID;
+        private static DiscordClient discordClient;
 
         public PluginMain()
         {
-            
+          
         }
-
-        public void LoadConfig(string path)
-        {
-            using (StreamReader file = File.OpenText(path))
-            {
-                JsonSerializer serializer = new JsonSerializer();
-                myConfig = (MyConfig)serializer.Deserialize(file, typeof(MyConfig));
-            }
-        }
-
-        public void SaveConfig(string path)
-        {
-            JsonSerializer serializer = new JsonSerializer();
-            serializer.NullValueHandling = NullValueHandling.Ignore;
-
-            using (StreamWriter sw = new StreamWriter(path))
-            using (JsonWriter writer = new JsonTextWriter(sw))
-            {
-                serializer.Serialize(writer, myConfig);
-            }
-        }
-
-        private void ThreadStart()
-     => StartBotAsync().GetAwaiter().GetResult();
 
         public override void Init(string modDirectory)
         {
-            string path = Path.Combine(modDirectory, "Config.json");
+            MyConfig.FileName = Path.Combine(modDirectory, "Config.xml");
 
-            if (File.Exists(path))
-                LoadConfig(path);
+            var config = new MyConfig();
+            debugMode = config.Settings.DebugMode;
+            channelID = config.Settings.MainChannelID;
 
-            GetServer.NetworkController.EventSystem.AddListener(typeof(TextChatMessage), new EventSystem.NetworkDataDelegate(this.TextChatMessageListener));
-            GetServer.NetworkController.EventSystem.AddListener(typeof(PlayerSpawnRequest), new EventSystem.NetworkDataDelegate(this.PlayerSpawnRequest));
+            discordClient = new DiscordClient();
 
-            var serverThread = new Thread(this.ThreadStart);
-            serverThread.IsBackground = true;
-            serverThread.Start();
+            SetupServerEventHandlers();
+            SetupDiscordEventHandlers();
+
+            DiscordClient.Instance.Start();
+
             Console.WriteLine("HESDiscordChatBot - Bot Started");
         }
 
-        private void PlayerSpawnRequest(NetworkData data)
+        private void SetupDiscordEventHandlers()
+        {
+            DiscordClient.SocketClient.MessageReceived += SocketClient_MessageReceived;
+        }
+
+        private void SetupServerEventHandlers()
+        {
+            // the text chat message
+            GetServer.NetworkController.EventSystem.AddListener(typeof(TextChatMessage), new EventSystem.NetworkDataDelegate(this.TextChatMessageListener));
+
+            //new player spawned
+            GetServer.NetworkController.EventSystem.AddListener(typeof(PlayersOnServerRequest), new EventSystem.NetworkDataDelegate(this.PlayerOnServerListener));
+
+            //player spawned
+            GetServer.NetworkController.EventSystem.AddListener(typeof(PlayerSpawnRequest), new EventSystem.NetworkDataDelegate(this.PlayerSpawnRequestListener));
+
+            //player has disconnected from the server
+            GetServer.NetworkController.EventSystem.AddListener(typeof(LogOutRequest), new EventSystem.NetworkDataDelegate(this.LogOutRequestListener));
+        }
+
+        private Task SocketClient_MessageReceived(SocketMessage messageParam)
+        {
+            var message = messageParam as SocketUserMessage;
+            string outMsg = String.Empty;
+
+            if (message != null)
+            {
+                // if the channel is the main channel
+                if (message.Channel.Id == MyConfig.Instance.Settings.MainChannelID)
+                {
+                    // if the sender isn't a bot
+                    if (!message.Author.IsBot)
+                    {
+                        outMsg = $"Discord - {message.Author.Username}: {message.Content}";
+                        GetPluginHelper.SendMessageToServer(outMsg);
+                    }
+                }
+            }
+
+            return Task.Run(() => Console.WriteLine(!MyConfig.Instance.Settings.PrintDiscordChatToConsole ? String.Empty : outMsg));
+        }
+
+        private void PlayerOnServerListener(NetworkData data)
+        {
+            PlayersOnServerRequest request = data as PlayersOnServerRequest;
+            if (request == null)
+                return;
+
+            var player = GetServer.GetPlayer(request.Sender);
+            string outMsg = $"A new player '{player.Name}' has connected to the game server.";
+            DiscordClient.SendMessageToChannel(MyConfig.Instance.Settings.MainChannelID, outMsg);
+        }
+
+        private void LogOutRequestListener(NetworkData data)
+        {
+            LogOutRequest request = data as LogOutRequest;
+            if (request == null)
+                return;
+
+            var player = GetServer.GetPlayer(request.Sender);
+
+            string outMsg = $"{player.Name} disconnect from the game server.";
+            DiscordClient.SendMessageToChannel(MyConfig.Instance.Settings.MainChannelID, outMsg);
+        }
+
+        private void PlayerSpawnRequestListener(NetworkData data)
         {
             PlayerSpawnRequest playerSpawnRequest = data as PlayerSpawnRequest;
             if (playerSpawnRequest == null)
@@ -81,98 +112,19 @@ namespace HESDiscordChatBot
             var player = GetServer.GetPlayer(playerSpawnRequest.Sender);
 
             string outMsg = $"{player.Name} connected to the game server.";
-            SendMessageToGeneral(outMsg);
-        }
-
-        public async Task StartBotAsync()
-        {
-            try
-            {
-                Console.WriteLine("HESDiscordChatBot - Bot Connecting");
-
-                _client = new DiscordSocketClient();
-
-                _client.Connected += _client_Connected;
-                _client.Log += _client_Log;
-                _client.MessageReceived += MessageReceivedFromDiscord;
-                _client.LoggedIn += _client_LoggedIn;
-
-                try
-                {
-                    await _client.LoginAsync(TokenType.Bot, myConfig.DiscordToken);
-                }
-                catch { }
-                try
-                {
-                    await _client.StartAsync();
-                }
-                catch { }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("HESDiscordChatBot - Start Exception: " + ex.ToString());
-            }
-        }
-
-        private Task _client_LoggedIn()
-        {
-            return Task.Run(() => Console.WriteLine("HESDiscordChatBot - Logged In"));
-        }
-
-        private Task _client_Connected()
-        {
-            return Task.Run(() => Console.WriteLine("HESDiscordChatBot - Connected"));
-        }
-
-        private Task _client_Log(LogMessage arg)
-        {
-            return Task.Run(() => Console.WriteLine(arg.Message));
-        }
-
-        public override void OnCommand(Player p, string command, string[] args)
-        {
-            if (command.ToLower() == "discordinfo")
-            {
-                Console.WriteLine("Discord Info");
-                Console.WriteLine("Connection:" + _client.ConnectionState.ToString());
-            }
-
-            if (command.ToLower() == "msgdiscord")
-            {
-                SendMessageToGeneral(args.ToString());
-                Console.WriteLine("Sent Message to Discord");
-            }
-        }
-
-        private async Task MessageReceivedFromDiscord(SocketMessage messageParam)
-        {
-            var message = messageParam as SocketUserMessage;
-
-            if (message == null) return;
-
-            if (message.Channel.Id == myConfig.MainChannelID)
-            {
-                if (!message.Author.IsBot)
-                {
-                    string outMsg = $"Discord [#general] - {message.Author.Username}: {message.Content}";
-                    GetPluginHelper.SendMessageToServer(outMsg);
-                    Console.WriteLine(outMsg);
-                }
-            }
+            DiscordClient.SendMessageToChannel(MyConfig.Instance.Settings.MainChannelID, outMsg);
         }
 
         public void TextChatMessageListener(NetworkData data)
         {
             TextChatMessage textChatMessage = data as TextChatMessage;
 
-            string outMsg = $"HES Server - {textChatMessage.Name}: {textChatMessage.MessageText} ";
+            string outMsg = $"Game Server - {textChatMessage.Name}: {textChatMessage.MessageText} ";
 
-            SendMessageToGeneral(outMsg);
+            DiscordClient.SendMessageToChannel(channelID, outMsg);
 
-            Console.WriteLine(outMsg);
+            if (MyConfig.Instance.Settings.PrintDiscordChatToConsole)
+                Console.WriteLine(outMsg);
         }
-
-        public static void SendMessageToGeneral(string message)
-                  => (_client.GetChannel(myConfig.MainChannelID) as IMessageChannel).SendMessageAsync(message);
     }
 }
