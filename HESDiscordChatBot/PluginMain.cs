@@ -72,7 +72,17 @@ namespace HESDiscordChatBot
                     if (!message.Author.IsBot)
                     {
                         outMsg = $"Discord - {message.Author.Username}: {message.Content}";
-                        GetPluginHelper.SendMessageToServer(outMsg);
+
+                        byte[] guid = Guid.NewGuid().ToByteArray();
+
+                        TextChatMessage textChatMessage = new TextChatMessage();
+
+                        textChatMessage.GUID = BitConverter.ToInt64(guid, 0);
+                        textChatMessage.Name = ("");
+                        textChatMessage.MessageText = outMsg;
+
+                        GetServer.NetworkController.SendToAllClients(textChatMessage, (textChatMessage).Sender);
+                      
                     }
                 }
             }
@@ -99,7 +109,7 @@ namespace HESDiscordChatBot
 
             var player = GetServer.GetPlayer(request.Sender);
 
-            string outMsg = $"{player.Name} disconnect from the game server.";
+            string outMsg = $"{player.Name} disconnected from the game server.";
             DiscordClient.SendMessageToChannel(MyConfig.Instance.Settings.MainChannelID, outMsg);
         }
 
