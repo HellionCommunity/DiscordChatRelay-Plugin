@@ -16,6 +16,8 @@ namespace HESDiscordChatBot
 
         private static bool debugMode;
 
+        public static bool botStarted = false;
+
         public DiscordClient()
         {
             Instance = this;
@@ -39,22 +41,27 @@ namespace HESDiscordChatBot
         {
             try
             {
-                Console.WriteLine("HESDiscordChatBot - Bot Connecting");
-               
-                SocketClient.Connected += _client_Connected;
-                SocketClient.Log += _client_Log; 
-                SocketClient.LoggedIn += _client_LoggedIn;
+                if (!botStarted)
+                {
+                    Console.WriteLine("HESDiscordChatBot - Bot Connecting");
 
-                try
-                {
-                    await SocketClient.LoginAsync(TokenType.Bot, MyConfig.Instance.Settings.DiscordToken);
+                    SocketClient.Connected += _client_Connected;
+                    SocketClient.Log += _client_Log;
+                    SocketClient.LoggedIn += _client_LoggedIn;
+
+                    try
+                    {
+                        await SocketClient.LoginAsync(TokenType.Bot, MyConfig.Instance.Settings.DiscordToken);
+                    }
+                    catch { }
+                    try
+                    {
+                        await SocketClient.StartAsync();
+                    }
+                    catch { }
                 }
-                catch { }
-                try
-                {
-                    await SocketClient.StartAsync();
-                }
-                catch { }
+
+               
             }
             catch (Exception ex)
             {
@@ -69,6 +76,7 @@ namespace HESDiscordChatBot
 
         private Task _client_Connected()
         {
+            botStarted = true;
             return Task.Run(() => Console.WriteLine(!debugMode ? String.Empty : "HESDiscordChatBot - Connected"));
         }
 
@@ -81,6 +89,10 @@ namespace HESDiscordChatBot
         {
             (SocketClient.GetChannel(channelID) as IMessageChannel).SendMessageAsync(message);
         }
-                 
+
+        internal void SendMessageToMainChannel(string message)
+        {
+            (SocketClient.GetChannel(MyConfig.Instance.Settings.MainChannelID) as IMessageChannel).SendMessageAsync(message);
+        }
     }
 }
