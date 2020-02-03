@@ -18,13 +18,19 @@ namespace HESDiscordChatBot
 
         public static bool botStarted = false;
 
-        public DiscordClient()
+        public DiscordClient(MyConfig config)
         {
-            Instance = this;
+            try
+            {
+                Instance = this;
 
-            debugMode = MyConfig.Instance.Settings.DebugMode;
+                Console.WriteLine(!config.Settings.DebugMode ? String.Empty : "HESDiscordChatBot - Bot Client Constructed");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error constructing DiscordPlugin:\n" + ex.ToString());
+            }
 
-            Console.WriteLine(!debugMode ? String.Empty : "HESDiscordChatBot - Bot Client Constructed");
         }
 
         public void Start()

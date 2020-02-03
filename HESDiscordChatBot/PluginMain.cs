@@ -2,10 +2,10 @@
 using HellionExtendedServer.Common.Plugins;
 using HellionExtendedServer.Managers.Plugins;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using ZeroGravity.Network;
-using ZeroGravity.Helpers;
 
 namespace HESDiscordChatBot
 {
@@ -16,7 +16,7 @@ namespace HESDiscordChatBot
         private static ulong channelID;
         private static DiscordClient discordClient;
 
-        public ThreadSafeDictionary<long, NetworkController.Client> Clients { get { return GetServer.NetworkController.clientList; } }
+        public Dictionary<long, NetworkController.Client> Clients { get { return GetServer.NetworkController.ClientList; } }
 
         public PluginMain()
         {
@@ -28,17 +28,26 @@ namespace HESDiscordChatBot
         {
             try
             {
+
                 MyConfig.FileName = Path.Combine(modDirectory, "Config.xml");
 
                 var config = new MyConfig();
                 debugMode = config.Settings.DebugMode;
                 channelID = config.Settings.MainChannelID;
 
-                discordClient = new DiscordClient();
+                try
+                {
+                    discordClient = new DiscordClient(config);
 
-                DiscordClient.SocketClient.MessageReceived += SocketClient_MessageReceived;
+                    DiscordClient.SocketClient.MessageReceived += SocketClient_MessageReceived;
 
-                DiscordClient.Instance.Start();
+                    DiscordClient.Instance.Start();
+                }
+                catch (Exception ex1)
+                {
+                    GetLogger.Warn(ex1, "HESDiscordChatBot Discord Initialization failed.");
+                }
+
 
                 Console.WriteLine("HESDiscordChatBot - Bot Started");
 
@@ -59,9 +68,12 @@ namespace HESDiscordChatBot
                 Console.Write(" [LogOutRequest]");
 
                 Console.WriteLine("HESDiscordChatBot - Events Registered!");
+
+
             }
             catch (Exception ex)
             {
+                Console.WriteLine(ex.ToString());
                 GetLogger.Warn(ex, "HESDiscordChatBot Initialization failed.");
             }
           
