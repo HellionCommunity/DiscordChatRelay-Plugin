@@ -33,16 +33,20 @@ Config.xml
     
     DebugMode - enables debug mode, prints more information to the console.
   
+  
 The messages all support template replacers, the available replacers are;
   
 All:
-     (%PlayerName%) - The name of the player - all but Discord to Server
-     (%CurrentDateTime%) - the current date and time
+ 
+    (%PlayerName%) - The name of the player - all but Discord to Server
+    (%CurrentDateTime%) - the current date and time
      
 Server to Discord:
+
      (%ChatMessage%) - the chat message
 
 Discord to Server:
+
      (%DiscordChannelName%) - the name of the incoming channel
      (%DiscordUserName%)    - the username of the discord user
      (%DiscordChatMessage%) - The message from discord to the game
