@@ -93,7 +93,13 @@ namespace HESDiscordChatBot
                     // if the sender isn't this bot
                     if (message.Author.Id != MyConfig.Instance.Settings.BotClientID)
                     {
-                        outMsg = $"Discord - {message.Author.Username}: {message.Content}";
+
+                        outMsg = MyConfig.Instance.Settings.MessageSentToGameServer
+                            .Replace("(%DiscordChannelName%)", message.Channel.Name)
+                            .Replace("(%DiscordUserName%)", message.Author.Username)
+                            .Replace("(%DiscordChatMessage%)", message.Content)
+                            .Replace("(%CurrentDateTime%)", new DateTime().ToString())
+                            ?? $"Discord - {message.Author.Username}: {message.Content}";
 
                         byte[] guid = Guid.NewGuid().ToByteArray();
 
@@ -102,6 +108,7 @@ namespace HESDiscordChatBot
                         textChatMessage.GUID = BitConverter.ToInt64(guid, 0);
                         textChatMessage.Name = ("");
                         textChatMessage.MessageText = outMsg;
+
 
                         GetServer.NetworkController.SendToAllClients(textChatMessage, (textChatMessage).Sender);
 
@@ -115,9 +122,10 @@ namespace HESDiscordChatBot
             return Task.Run(() => Console.WriteLine(!MyConfig.Instance.Settings.PrintDiscordChatToConsole ? String.Empty : outMsg));
         }
 
-
         private async void RespawnRequestListener(NetworkData data)
         {
+            if (MyConfig.Instance.Settings.PlayerRespawningMessage.StartsWith("null")) return;
+
             if (debugMode)
                 Console.WriteLine($"<- Sending Respawn Message To Discord");
 
@@ -128,13 +136,16 @@ namespace HESDiscordChatBot
             if (player == null)
                 return;
 
-            string outMsg = $"Player '{player.Name}' is respawning on the game server.";
+            string outMsg = MyConfig.Instance.Settings.PlayerRespawningMessage.Replace("(%PlayerName%)", player.Name).Replace("(%CurrentDateTime%)", new DateTime().ToString())
+                ?? $"Player '{player.Name}' is respawning on the game server.";
 
             await (DiscordClient.SocketClient.GetChannel(MyConfig.Instance.Settings.MainChannelID) as Discord.IMessageChannel).SendMessageAsync(outMsg);
         }
 
         public async void PlayerOnServerListener(NetworkData data)
         {
+            if (MyConfig.Instance.Settings.NewPlayerSpawningMessage.StartsWith("null")) return;
+
             if (debugMode)
                 Console.WriteLine($"<- Sending New Player Message To Discord");
 
@@ -145,7 +156,8 @@ namespace HESDiscordChatBot
             if (player == null)
                 return;
 
-            string outMsg = $"A new player '{player.Name}' has connected to the game server.";
+            string outMsg = MyConfig.Instance.Settings.NewPlayerSpawningMessage.Replace("(%PlayerName%)", player.Name).Replace("(%CurrentDateTime%)", new DateTime().ToString())
+                ?? $"A new player '{player.Name}' has connected to the game server.";
 
             await (DiscordClient.SocketClient.GetChannel(MyConfig.Instance.Settings.MainChannelID) as Discord.IMessageChannel).SendMessageAsync(outMsg);
 
@@ -154,6 +166,8 @@ namespace HESDiscordChatBot
 
         public async void LogOutRequestListener(NetworkData data)
         {
+            if (MyConfig.Instance.Settings.PlayerLeavingMessage.StartsWith("null")) return;
+
             if (debugMode)
                 Console.WriteLine($"<- Sending Disconnect Message To Discord");
 
@@ -164,12 +178,16 @@ namespace HESDiscordChatBot
             if (player == null)
                 return;
 
-            string outMsg = $"{player.Name} disconnected from the game server.";
+            string outMsg = MyConfig.Instance.Settings.PlayerLeavingMessage.Replace("(%PlayerName%)", player.Name).Replace("(%CurrentDateTime%)", new DateTime().ToString())
+                ?? $"{player.Name} disconnected from the game server.";
+
             await (DiscordClient.SocketClient.GetChannel(MyConfig.Instance.Settings.MainChannelID) as Discord.IMessageChannel).SendMessageAsync(outMsg);
         }
 
         public async void PlayerSpawnRequestListener(NetworkData data)
         {
+            if (MyConfig.Instance.Settings.PlayerSpawningMessage.StartsWith("null")) return;
+
             if (debugMode)
                 Console.WriteLine($"<- Sending Player Spawn To Discord");
 
@@ -180,19 +198,25 @@ namespace HESDiscordChatBot
             if (player == null)
                 return;
 
-            string outMsg = $"{player.Name} connected to the game server.";
+            string outMsg = MyConfig.Instance.Settings.PlayerSpawningMessage.Replace("(%PlayerName%)",player.Name).Replace("(%CurrentDateTime%)", new DateTime().ToString())
+                ?? $"{player.Name} connected to the game server.";
             await (DiscordClient.SocketClient.GetChannel(MyConfig.Instance.Settings.MainChannelID) as Discord.IMessageChannel).SendMessageAsync(outMsg);
         }
 
         public async void TextChatMessageListener(NetworkData data)
         {
+            if (MyConfig.Instance.Settings.MessageSentToDiscord.StartsWith("null")) return;
+
             if (debugMode)
                 Console.WriteLine($"<- Sending Message To Discord");
 
             TextChatMessage textChatMessage = data as TextChatMessage;
 
-            string outMsg = $"Game Server - {textChatMessage.Name}: {textChatMessage.MessageText} ";
+           
+            string outMsg = MyConfig.Instance.Settings.MessageSentToDiscord.Replace("(%PlayerName%)", textChatMessage.Name).Replace("(%ChatMessage%)", textChatMessage.MessageText).Replace("(%CurrentDateTime%)", new DateTime().ToString())
+                ?? $"Game Server - {textChatMessage.Name}: {textChatMessage.MessageText} ";
 
+            
             await (DiscordClient.SocketClient.GetChannel(MyConfig.Instance.Settings.MainChannelID) as Discord.IMessageChannel).SendMessageAsync(outMsg);
 
             if (MyConfig.Instance.Settings.PrintDiscordChatToConsole)

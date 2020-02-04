@@ -32,15 +32,13 @@ namespace HESDiscordChatBot
 
         public string PlayerSpawningMessage { get; set; }
 
+        public string PlayerRespawningMessage { get; set; }
 
         public string PlayerLeavingMessage { get; set; }
 
-
         public string MessageSentToDiscord { get; set; }
 
-
         public string MessageSentToGameServer { get; set; }
-
 
         public string NewPlayerSpawningMessage { get; set; }
 
@@ -50,13 +48,14 @@ namespace HESDiscordChatBot
         public Settings()
         {
 
-            DiscordToken = "<discordtokenhere>";
+            DiscordToken = "discordtokenhere";
             BotClientID = 0;
             MainChannelID = 0;
             DebugMode = true;
             PrintDiscordLogToConsole = true;
             PrintDiscordChatToConsole = true;
             PlayerSpawningMessage = $"(%PlayerName%) connected to the game server at (%CurrentDateTime%)";
+            PlayerRespawningMessage = $"(%PlayerName%) has respawned at (% CurrentDateTime %)";
             NewPlayerSpawningMessage = $"A new Player has connected! Welcome (%PlayerName%)!";
             PlayerLeavingMessage = $"(%PlayerName%) has left the game server at (%CurrentDateTime%)";
             MessageSentToDiscord = $"HES Server - (%PlayerName%): (%ChatMessage%) ";
